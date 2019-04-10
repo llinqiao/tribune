@@ -1,22 +1,24 @@
 const express = require('express')
 const moment = require('moment')
+
+const sqlite3 = require('sqlite3').verbose()//引入数据库，verbose函数会返回更多的信息
 const cookieParser = require('cookie-parser')
 
 const app = express()
 
 const port = 3001
 
-const users = [{
-  id: 42,
-  name: 'damiao',
-  password: '123456',
+console.log('opening detabase...')
+const db = new sqlite3.Database(__dirname+'/tribune.sqlite3',()=>{
+  console.log('detabase open success')
+  console.log('starting web server...')
+  app.listen(port,()=>{
+    console.log('server listening on port',port)
+   
+  })
+})//连接数据库文件异步打开，等数据库打开在启动服务器，成功打开数据库在回调里面打开服务器
 
-}, {
-  id: 41,
-  name: 'a',
-  password: 'a',
 
-}]
 
 const comments = []
 
@@ -46,7 +48,9 @@ app.set('view engine', 'pug')//设置使用的模板引擎
 app.set('views', __dirname + '/templates')//设置模板文件的文件夹
 
 app.use(express.json())//express自动解析请求体
-app.use(express.urlencoded())
+app.use(express.urlencoded({
+  extended: true //开启解析扩展url编码的功能:foo[bar]=a&foo[baz]=b
+}))
 app.use(cookieParser())
 
 app.use((req, res, next) => {
@@ -68,7 +72,7 @@ app.get('/', (req, res, next) => {
 
 app.get('/post/:id', (req, res, next) => {
   var post = posts.find(it => it.id == req.params.id)
-  res.render('post', {
+  res.render('post.pug', {
     post: post,
     user: req.user,
   })
@@ -152,6 +156,3 @@ app.get('/logout', (req, res, next) => {
 
 
 
-app.listen(port, () => {
-  console.log('server listening on port', port)
-})
