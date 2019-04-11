@@ -9,12 +9,12 @@ const app = express()
 const port = 3001
 
 console.log('opening detabase...')
-const db = new sqlite3.Database(__dirname+'/tribune.sqlite3',()=>{
+const db = new sqlite3.Database(__dirname + '/tribune.sqlite3', () => {
   console.log('detabase open success')
   console.log('starting web server...')
-  app.listen(port,()=>{
-    console.log('server listening on port',port)
-   
+  app.listen(port, () => {
+    console.log('server listening on port', port)
+
   })
 })//连接数据库文件异步打开，等数据库打开在启动服务器，成功打开数据库在回调里面打开服务器
 
@@ -54,10 +54,19 @@ app.use(express.urlencoded({
 app.use(cookieParser())
 
 app.use((req, res, next) => {
-  if (req.cookies.user) {
-    req.user = users.find(it => it.name == req.cookies.user)
+  if (req.cookies.loginUser) {
+    req.user = db.get('SELECT * FROM users WHERE name=" ' + req.cookies.loginUser + '"', (err, user) => {
+      if (err) {
+        next(err)
+      } else {
+        req.user = user
+        next()
+      }
+    })
+  } else {
+    next()
   }
-  next()
+
 })//通过cookies来找到用户
 
 app.get('/', (req, res, next) => {
@@ -105,25 +114,44 @@ app.route('/register')
     res.render('register.pug')
   })
   .post((req, res, next) => {
-    if (users.find(it => it.name == req.body.name) == null) {
-      var lastUser = users[users.length - 1]
-      req.body.id = lastUser.id + 1
-      users.push(req.body)
-      res.cookie('user', req.body.name, {
+    db.run('INSERT INTO users (name,password) VALUES (?,?)', req.body.name, req.body.password, (err) => {
+      if (err) {
+        res.render('register-result.pug', {
+          status: 'USERNAME_USED'
+        })
+      } else {
+        res.cookie('loginUser', req.body.name, {
 
-      })
-      res.render('register-result.pug', {
-        user: req.body,
-        status: 'SUCCESS'
-      })
-    } else {
-      res.render('register-result.pug', {
-        
-        status: 'USERNAME_USED'
-      })
-    }
+        })
+        res.render('register-result.pug', {
+          user: req.body,
+          status: 'SUCCESS'
+        })
+      }
+    })
+  })//注册页面数据库版本
 
-  })//注册页面
+
+
+// if (users.find(it => it.name == req.body.name) == null) {
+//   var lastUser = users[users.length - 1]
+//   req.body.id = lastUser.id + 1
+//   users.push(req.body)
+//   res.cookie('user', req.body.name, {
+
+//   })
+//   res.render('register-result.pug', {
+//     user: req.body,
+//     status: 'SUCCESS'
+//   })
+// } else {
+//   res.render('register-result.pug', {
+
+//     status: 'USERNAME_USED'
+//   })
+// }
+
+//注册页面,数组版
 
 
 
@@ -133,24 +161,41 @@ app.route('/login')
 
   })
   .post((req, res, next) => {
-    var user = users.find(it => it.name == req.body.name)
-    if (user) {
-      if (user.password == req.body.password) {
-        res.cookie('user', user.name, {
-          expires: new Date(Date.now() + 86400000),
-
-        })
-        res.redirect('/')//登录成功页面跳转到首页
+    db.get('SELECT * FROM users WHERE name = ?AND password=?', req.body.name, req.body.password, (err, user) => {
+      if (err) {
+        next(err)
       } else {
-        res.send('密码错误')
+        if (user) {
+          res.cookie('loginUser', user.name, {
+            expires: new Date(Date.now() + 86400000),
+
+          })
+          res.redirect('/')//登录成功页面跳转到首页
+        } else {
+          res.send('用户名或密码错误！')
+        }
       }
-    } else {
-      res.send('用户不存在')
-    }
+    })
   })
 
+//   var user = users.find(it => it.name == req.body.name)
+//   if (user) {
+//     if (user.password == req.body.password) {
+//       res.cookie('user', user.name, {
+//         expires: new Date(Date.now() + 86400000),
+
+//       })
+//       res.redirect('/')//登录成功页面跳转到首页
+//     } else {
+//       res.send('密码错误')
+//     }
+//   } else {
+//     res.send('用户不存在')
+//   }
+// })
+
 app.get('/logout', (req, res, next) => {
-  res.clearCookie('user')
+  res.clearCookie('loginUser')
   res.redirect('/')
 })
 
